@@ -1,262 +1,75 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>退休金需求試算</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #e0f2fe;
-        }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #fff;
-            border-radius: 10px;
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #333;
-        }
-        .section {
-            margin-bottom: 20px;
-        }
-        .section h2 {
-            color: #0066cc;
-        }
-        .section h3, .section h4 {
-            margin: 0 0 10px 0;
-            color: #0066cc;
-            font-size: 18px;
-            font-weight: bold;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            padding: 10px;
-            border: 1px solid #ddd;
-            box-sizing: border-box;
-            text-align: left;
-        }
-        th:first-child, td:first-child {
-            width: 300px;
-        }
-        th:nth-child(2), td:nth-child(2) {
-            width: 150px;
-        }
-        th:nth-child(3), td:nth-child(3) {
-            width: 120px;
-            white-space: nowrap;
-        }
-        input[type="number"], input[type="text"] {
-            width: 100%;
-            padding: 5px;
-            box-sizing: border-box;
-            border: 1px solid #93c5fd;
-            border-radius: 4px;
-        }
-        .result, .retirement-gap, .total-retirement-needs {
-            font-weight: bold;
-            color: #0066cc;
-            display: block;
-        }
-        .retirement-gap, .total-retirement-needs {
-            font-size: 20px;
-            text-align: center;
-            margin-bottom: 10px;
-        }
-        hr {
-            border: 0;
-            border-top: 1px solid #ddd;
-            margin: 15px 0;
-        }
-        .result-block {
-            margin-bottom: 7.5px;
-            padding: 15px;
-            border-radius: 8px;
-        }
-        .result-block h3 {
-            margin: 0 0 10px 0;
-            color: #0066cc;
-            font-size: 18px;
-            font-weight: bold;
-        }
-        .total-retirement-needs {
-            margin-bottom: 7.5px;
-        }
-        .error-message {
-            color: #ff0000;
-            font-size: 14px;
-            margin-bottom: 10px;
-            display: none;
-        }
-        .sub-item-container {
-            overflow: auto;
-            width: 100%;
-            box-sizing: border-box;
-            background-color: #f9fafb; /* 與 #lowRiskSubItemsRow 一致 */
-            transition: max-height 0.3s ease;
-        }
-        .sub-item-container.expanded {
-            max-height: none;
-            padding: 10px;
-        }
-        .sub-item-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 5px;
-            padding: 5px 10px;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .sub-item-row input[type="text"] {
-            width: 350px; /* 增加寬度 */
-            margin-right: 8px; /* 調整間距 */
-        }
-        .sub-item-row input[type="number"] {
-            width: 170px; /* 增加比例欄寬度 */
-            margin-right: 8px;
-        }
-        .sub-item-row input[type="number"]:last-of-type {
-            width: 140px; /* 增加報酬率欄寬度 */
-        }
-        .sub-item-row button {
-            margin-left: 8px;
-            padding: 5px 10px;
-            background-color: #0066cc;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .sub-item-row button:hover {
-            background-color: #0052a3;
-        }
-        .add-sub-item {
-            margin: 10px 0 10px 10px;
-            padding: 8px 15px;
-            background-color: #0066cc;
-            color: #fff;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .add-sub-item:hover {
-            background-color: #0052a3;
-        }
-        .toggle-sub-items {
-            background: none;
-            border: none;
-            color: #0066cc;
-            font-size: 14px;
-            cursor: pointer;
-            margin-left: 5px;
-            transition: transform 0.3s ease;
-        }
-        .toggle-sub-items.expanded {
-            transform: rotate(180deg);
-        }
-        #lowRiskSubItemsRow {
-            background-color: #f9fafb; /* 恢復背景色 */
-        }
-        #lowRiskSubItems {
-            display: flex;
-            flex-direction: column;
-            width: 100%;
-        }
-        #lowRiskSubItemsError {
-            margin: 10px 0 10px 10px;
-        }
-        #lowRiskWeightedROI {
-            margin-left: 10px;
-        }
-        #lowRiskSubItemsRow td {
-            padding: 0;
-        }
-        #lowRiskSubItemsResults {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        #lowRiskSubItemsResults th, #lowRiskSubItemsResults td {
-            padding: 8px;
-            border: 1px solid #ddd;
-            text-align: left;
-        }
-        #lowRiskSubItemsResults th:first-child, #lowRiskSubItemsResults td:first-child {
-            width: 350px; /* 與輸入框對齊 */
-        }
-        #lowRiskSubItemsResults th:nth-child(2), #lowRiskSubItemsResults td:nth-child(2) {
-            width: 170px; /* 與比例輸入框對齊 */
-        }
-        #lowRiskSubItemsResults th:nth-child(3), #lowRiskSubItemsResults td:nth-child(3) {
-            width: 150px;
-        }
-        #lowRiskSubItemsResults th:nth-child(4), #lowRiskSubItemsResults td:nth-child(4) {
-            width: 150px;
-        }
-        #lowRiskSubItemsResults th:nth-child(5), #lowRiskSubItemsResults td:nth-child(5) {
-            width: 150px;
-        }
-        #lowRiskSubItemsResults .result {
-            font-weight: normal;
-        }
+        /* 基礎設定 */
+        body { font-family: Arial, sans-serif; margin: 10px; background-color: #e0f2fe; }
+        .container { max-width: 800px; margin: 0 auto; padding: 15px; background-color: #fff; border-radius: 10px; box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1); }
+        h1 { text-align: center; color: #333; font-size: 24px; }
+        .section { margin-bottom: 20px; }
+        .section h2 { color: #0066cc; font-size: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 5px; }
+        .section h3, .section h4 { margin: 15px 0 10px 0; color: #0066cc; font-size: 18px; font-weight: bold; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+        th, td { padding: 8px; border: 1px solid #ddd; text-align: left; vertical-align: middle; }
+        .two-col-table th:first-child, .two-col-table td:first-child { width: 55%; }
+        .two-col-table th:nth-child(2), .two-col-table td:nth-child(2) { width: 45%; }
+        .three-col-table th:nth-child(1), .three-col-table td:nth-child(1) { width: 40%; }
+        .three-col-table th:nth-child(2), .three-col-table td:nth-child(2) { width: 30%; white-space: nowrap; }
+        .three-col-table th:nth-child(3), .three-col-table td:nth-child(3) { width: 30%; }
+        input[type="number"], input[type="text"], input[type="date"], input[type="tel"], select { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #93c5fd; border-radius: 4px; font-size: 16px; background-color: #fff; }
+        .input-group { display: flex; align-items: center; }
+        .input-group input { flex-grow: 1; margin-right: 5px; }
+        .result, .retirement-gap, .total-retirement-needs { font-weight: bold; color: #0066cc; }
+        .retirement-gap, .total-retirement-needs { font-size: 18px; text-align: center; margin: 15px 0; display: block; }
+        .result-block { margin-bottom: 10px; padding: 10px; background-color: #f8fafc; border-radius: 8px; }
+        .sub-item-container { width: 100%; box-sizing: border-box; background-color: #f9fafb; padding: 10px; }
+        .sub-item-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #ddd; }
+        .sub-item-row input[type="text"] { flex: 2; min-width: 120px; }
+        .sub-item-row input[type="number"] { flex: 1; min-width: 70px; }
+        .sub-item-row button { padding: 5px 10px; background-color: #0066cc; color: #fff; border: none; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .table-responsive table { min-width: 600px; }
+        .table-responsive th { white-space: nowrap; }
+        .toggle-sub-items { background: none; border: none; color: #0066cc; font-size: 14px; cursor: pointer; margin-left: 5px; white-space: nowrap; }
+        .main-btn { width: 100%; max-width: 400px; padding: 15px; margin: 20px auto; display: block; font-size: 18px; font-weight: bold; background-color: #0066cc; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.3s ease; }
+        .main-btn:hover { background-color: #0052a3; transform: translateY(-2px); }
+        .export-btn { width: 100%; max-width: 400px; padding: 15px; margin: 20px auto; display: block; font-size: 18px; font-weight: bold; background-color: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: background-color 0.3s; }
+        .export-btn:hover { background-color: #059669; }
+        .error-message { color: #ff0000; font-size: 14px; display: none; margin-bottom: 5px;}
     </style>
 </head>
 <body>
     <div class="container">
         <h1>退休金需求試算</h1>
+        
+        <div class="section">
+            <h2>基本資料</h2>
+            <table class="two-col-table">
+                <tr><th>項目</th><th>內容</th></tr>
+                <tr><td>姓名</td><td><input type="text" id="clientName" placeholder="請輸入姓名"></td></tr>
+                <tr><td>出生年月日</td><td><input type="date" id="clientDOB"></td></tr>
+                <tr><td>電話號碼</td><td><input type="tel" id="clientPhone" placeholder="例如: 0912345678"></td></tr>
+                <tr><td>職業</td><td><input type="text" id="clientJob" placeholder="請輸入職業"></td></tr>
+                <tr><td>性別</td>
+                    <td>
+                        <select id="clientGender">
+                            <option value="">請選擇</option>
+                            <option value="男">男</option>
+                            <option value="女">女</option>
+                        </select>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
         <div class="section">
             <h2>輸入參數</h2>
-            <!-- 年齡 -->
             <div class="section">
                 <h3>年齡</h3>
-                <table>
+                <table class="two-col-table">
                     <tr><th>參數項目</th><th>數值</th></tr>
                     <tr><td>目前年齡</td><td><input type="number" id="currentAge" value="30" min="0" onchange="calculate()"></td></tr>
                     <tr><td>開始工作年齡</td><td><input type="number" id="workStartAge" value="23" min="0" onchange="calculate()"></td></tr>
@@ -264,19 +77,19 @@
                     <tr><td>預計終老年齡</td><td><input type="number" id="lifeExpectancy" value="88" min="0" onchange="calculate()"></td></tr>
                 </table>
             </div>
-            <!-- 薪資 -->
+            
             <div class="section">
                 <h3>薪資</h3>
-                <table>
+                <table class="two-col-table">
                     <tr><th>參數項目</th><th>數值</th></tr>
                     <tr><td>目前月薪</td><td><input type="number" id="currentSalary" value="70000" min="0" onchange="calculate()"></td></tr>
                     <tr><td>年加薪率 (%)</td><td><input type="number" id="salaryIncreaseRate" value="1.5" step="0.1" min="0" onchange="calculate()"></td></tr>
                 </table>
             </div>
-            <!-- 生活與投資 -->
+            
             <div class="section">
                 <h3>生活與投資</h3>
-                <table>
+                <table class="two-col-table">
                     <tr><th>參數項目</th><th>數值</th></tr>
                     <tr><td>退休時的生活花費</td><td><input type="number" id="currentLivingStandard" value="60000" min="0" onchange="calculate()"></td></tr>
                     <tr><td>通膨率 (%)</td><td><input type="number" id="inflationRate" value="1.8" step="0.1" min="0" onchange="calculate()"></td></tr>
@@ -284,30 +97,30 @@
                     <tr><td>退休後投資報酬率 (%)</td><td><input type="number" id="postRetirementROI" value="4" step="0.1" min="0" onchange="calculate()"></td></tr>
                 </table>
             </div>
-            <!-- 享樂 -->
+            
             <div class="section">
                 <h3>享樂</h3>
-                <table>
+                <table class="two-col-table">
                     <tr><th>參數項目</th><th>數值</th></tr>
                     <tr><td>現在每年享樂費</td><td><input type="number" id="currentTravelCost" value="60000" min="0" onchange="calculate()"></td></tr>
                     <tr><td>享樂費通膨率 (%)</td><td><input type="number" id="travelCostGrowthRate" value="2.5" step="0.1" min="0" onchange="calculate()"></td></tr>
                     <tr><td>想享樂到幾歲</td><td><input type="number" id="travelUntilAge" value="75" min="0" onchange="calculate()"></td></tr>
                 </table>
             </div>
-            <!-- 長照 -->
+            
             <div class="section">
                 <h3>長照</h3>
-                <table>
+                <table class="two-col-table">
                     <tr><th>參數項目</th><th>數值</th></tr>
                     <tr><td>現在每月長照費</td><td><input type="number" id="currentCareCost" value="50000" min="0" onchange="calculate()"></td></tr>
                     <tr><td>長照費通膨率 (%)</td><td><input type="number" id="careCostGrowthRate" value="2" step="0.1" min="0" onchange="calculate()"></td></tr>
                     <tr><td>長照開始年齡</td><td><input type="number" id="careStartAge" value="75" min="0" onchange="calculate()"></td></tr>
                 </table>
             </div>
-            <!-- 資金 -->
+            
             <div class="section">
                 <h3>資金</h3>
-                <table>
+                <table class="two-col-table">
                     <tr><th>參數項目</th><th>數值</th></tr>
                     <tr><td>勞保平均投保薪資</td><td><input type="number" id="laborInsurance" value="45800" min="0" onchange="calculate()"></td></tr>
                     <tr><td>勞退</td><td><input type="number" id="laborPension" value="0" min="0" onchange="calculate()"></td></tr>
@@ -315,228 +128,271 @@
                 </table>
             </div>
         </div>
-        <div class="section">
-            <h2>退休金需求試算結果</h2>
-            <!-- 退休 -->
-            <div class="result-block">
-                <h3>退休</h3>
-                <table>
-                    <tr><th>計算項目</th><th>金額（NT$）</th></tr>
-                    <tr><td>退休時薪資</td><td><span id="retirementSalary" class="result"></span></td></tr>
-                    <tr><td>退休後月支出</td><td><span id="postRetirementExpense" class="result"></span></td></tr>
-                    <tr><td>退休生活總需求</td><td><span id="totalLivingNeeds" class="result"></span></td></tr>
-                </table>
-            </div>
-            <!-- 享樂 -->
-            <div class="result-block">
-                <h3>享樂</h3>
-                <table>
-                    <tr><th>計算項目</th><th>金額（NT$）</th></tr>
-                    <tr><td>未來每年享樂費</td><td><span id="futureTravelCost" class="result"></span></td></tr>
-                    <tr><td>享樂費總需求</td><td><span id="totalTravelNeeds" class="result"></span></td></tr>
-                </table>
-            </div>
-            <!-- 長照 -->
-            <div class="result-block">
-                <h3>長照</h3>
-                <table>
-                    <tr><th>計算項目</th><th>金額（NT$）</th></tr>
-                    <tr><td>未來每月長照費</td><td><span id="futureCareCost" class="result"></span></td></tr>
-                    <tr><td>長照總需求</td><td><span id="totalCareNeeds" class="result"></span></td></tr>
-                    <tr><td>退休時應備長照費</td><td><span id="retirementCareCost" class="result"></span></td></tr>
-                </table>
-            </div>
-            <div class="total-retirement-needs">
-                退休金總需求: <span id="totalRetirementNeeds" class="result"></span>
-            </div>
-        </div>
-        <div class="section">
-            <h2>目標達成試算結果</h2>
-            <table>
-                <tr><th>計算項目</th><th>金額（NT$）</th></tr>
-                <tr><td>勞保(65歲領)</td><td><span id="laborInsuranceAmount" class="result"></span></td></tr>
-                <tr><td>勞退</td><td><span id="laborPensionAmount" class="result"></span></td></tr>
-                <tr><td>自備</td><td><span id="selfPreparedAmount" class="result"></span></td></tr>
-                <tr><td>已準備資金</td><td><span id="preparedFunds" class="result"></span></td></tr>
-                <tr><td>退休金缺口</td><td><span id="retirementGap" class="result"></span></td></tr>
-            </table>
-        </div>
-        <div class="section">
-            <h2>投資參數</h2>
-            <div class="retirement-gap">
-                退休金缺口: <span id="retirementGapInvestment" class="result"></span>
-            </div>
-            <!-- 風險分配 -->
+
+        <button class="main-btn" id="startBtn" onclick="showResultsAndCalculate()">開始試算</button>
+
+        <div id="resultsArea" style="display: none;">
+            
+            <hr style="border: 0; border-top: 2px solid #93c5fd; margin: 30px 0;">
+
             <div class="section">
-                <h3>風險分配</h3>
-                <div id="riskAllocationError" class="error-message">風險分配比例總和必須為 100%</div>
-                <table>
-                    <tr><th>風險等級</th><th>分配比例 (%)</th><th>報酬率 (%)</th></tr>
-                    <tr>
-                        <td>低風險 <button class="toggle-sub-items" onclick="toggleLowRiskSubItems()">▼</button></td>
-                        <td><input type="number" id="lowRiskRatio" value="30" min="0" max="100" step="0.1" onchange="calculate()"></td>
-                        <td><span id="lowRiskROI" class="result">2.5</span></td>
-                    </tr>
-                    <tr class="sub-item-row" id="lowRiskSubItemsRow" style="display: none;">
-                        <td colspan="3">
-                            <div class="sub-item-container">
-                                <div id="lowRiskSubItems"></div>
-                                <button class="add-sub-item" onclick="addLowRiskSubItem()">新增低風險子項目</button>
-                                <div id="lowRiskSubItemsError" class="error-message">子項目比例總和必須為 100%</div>
-                                <div>加權平均報酬率: <span id="lowRiskWeightedROI" class="result">2.5%</span></div>
-                                <div style="margin-top: 10px;">
-                                    <h4>低風險子項目投資結果</h4>
-                                    <table id="lowRiskSubItemsResults">
-                                        <tr>
-                                            <th>子項目</th>
-                                            <th>分配比例 (%)</th>
-                                            <th>分配金額 (NT$)</th>
-                                            <th>單筆投資 (NT$)</th>
-                                            <th>每月投資 (NT$)</th>
-                                        </tr>
-                                    </table>
+                <h2>退休金需求試算結果</h2>
+                <div class="result-block">
+                    <h3>退休</h3>
+                    <table class="two-col-table">
+                        <tr><th>計算項目</th><th>金額（NT$）</th></tr>
+                        <tr><td>退休時薪資</td><td><span id="retirementSalary" class="result"></span></td></tr>
+                        <tr><td>退休後月支出</td><td><span id="postRetirementExpense" class="result"></span></td></tr>
+                        <tr><td>退休生活總需求</td><td><span id="totalLivingNeeds" class="result"></span></td></tr>
+                    </table>
+                </div>
+                <div class="result-block">
+                    <h3>享樂</h3>
+                    <table class="two-col-table">
+                        <tr><th>計算項目</th><th>金額（NT$）</th></tr>
+                        <tr><td>未來每年享樂費</td><td><span id="futureTravelCost" class="result"></span></td></tr>
+                        <tr><td>享樂費總需求</td><td><span id="totalTravelNeeds" class="result"></span></td></tr>
+                    </table>
+                </div>
+                <div class="result-block">
+                    <h3>長照</h3>
+                    <table class="two-col-table">
+                        <tr><th>計算項目</th><th>金額（NT$）</th></tr>
+                        <tr><td>未來每月長照費</td><td><span id="futureCareCost" class="result"></span></td></tr>
+                        <tr><td>長照總需求</td><td><span id="totalCareNeeds" class="result"></span></td></tr>
+                        <tr><td>退休時應備長照費</td><td><span id="retirementCareCost" class="result"></span></td></tr>
+                    </table>
+                </div>
+                <div class="total-retirement-needs">
+                    退休金總需求: <span id="totalRetirementNeeds" class="result"></span>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>目標達成試算結果</h2>
+                <table class="two-col-table">
+                    <tr><th>計算項目</th><th>金額（NT$）</th></tr>
+                    <tr><td>勞保(65歲領)</td><td><span id="laborInsuranceAmount" class="result"></span></td></tr>
+                    <tr><td>勞退</td><td><span id="laborPensionAmount" class="result"></span></td></tr>
+                    <tr><td>自備</td><td><span id="selfPreparedAmount" class="result"></span></td></tr>
+                    <tr><td>已準備資金</td><td><span id="preparedFunds" class="result"></span></td></tr>
+                    <tr><td>退休金缺口</td><td><span id="retirementGap" class="result"></span></td></tr>
+                </table>
+
+                <div class="retirement-gap" style="font-size: 22px; margin-top: 25px; padding: 10px; background-color: #f0f9ff; border-radius: 8px;">
+                    退休金缺口: <span id="retirementGapInvestment" class="result"></span>
+                </div>
+            </div>
+
+            <hr style="border: 0; border-top: 2px solid #93c5fd; margin: 35px 0;">
+
+            <div class="section">
+                <h2>投資參數與解方</h2>
+                
+                <div class="section">
+                    <h3>風險分配</h3>
+                    <div id="riskAllocationError" class="error-message">風險分配比例總和必須為 100%</div>
+                    <table class="three-col-table">
+                        <tr><th>風險等級</th><th>分配比例 (%)</th><th>報酬率 (%)</th></tr>
+                        <tr>
+                            <td>低風險 <button class="toggle-sub-items" onclick="toggleLowRiskSubItems()">▼</button></td>
+                            <td><div class="input-group"><input type="number" id="lowRiskRatio" value="30" min="0" max="100" step="0.1" onchange="calculate()"></div></td>
+                            <td><span id="lowRiskROI" class="result">2.5</span></td>
+                        </tr>
+                        <tr id="lowRiskSubItemsRow" style="display: none;">
+                            <td colspan="3">
+                                <div class="sub-item-container">
+                                    <div id="lowRiskSubItemsError" class="error-message">子項目比例總和必須為 100%</div>
+                                    <div id="lowRiskSubItems"></div>
+                                    <button class="add-sub-item" onclick="addLowRiskSubItem()" style="width:100%; margin:10px 0; padding:10px; background:#0066cc; color:#fff; border:none; border-radius:4px;">新增低風險子項目</button>
+                                    <div>加權平均報酬率: <span id="lowRiskWeightedROI" class="result">2.5%</span></div>
+                                    <div style="margin-top: 10px;">
+                                        <h4>低風險子項目投資結果</h4>
+                                        <div class="table-responsive">
+                                            <table id="lowRiskSubItemsResults">
+                                                <thead>
+                                                    <tr><th>子項目</th><th>分配比例 (%)</th><th>分配金額 (NT$)</th><th>單筆投資 (NT$)</th><th>每月投資 (NT$)</th></tr>
+                                                </thead>
+                                                <tbody id="subItemResultBody"></tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td>中風險</td>
-                        <td><input type="number" id="midRiskRatio" value="50" min="0" max="100" step="0.1" onchange="calculate()"></td>
-                        <td><input type="number" id="midRiskROI" value="5" min="0" step="0.1" onchange="calculate()"></td>
-                    </tr>
-                    <tr>
-                        <td>高風險</td>
-                        <td><input type="number" id="highRiskRatio" value="20" min="0" max="100" step="0.1" onchange="calculate()"></td>
-                        <td><input type="number" id="highRiskROI" value="8" min="0" step="0.1" onchange="calculate()"></td>
-                    </tr>
-                </table>
-            </div>
-            <!-- 投資年數 -->
-            <div class="section">
-                <h3>投資年數</h3>
-                <table>
-                    <tr><th>參數項目</th><th>數值</th></tr>
-                    <tr><td>單筆投資年數</td><td><input type="number" id="lumpSumYears" value="20" min="0" onchange="calculate()"></td></tr>
-                    <tr><td>定期定額投資年數</td><td><input type="number" id="monthlyYears" value="32" min="0" onchange="calculate()"></td></tr>
-                </table>
-            </div>
-            <!-- 風險投資結果 -->
-            <div class="section">
-                <h3>風險投資結果</h3>
-                <table>
-                    <tr>
-                        <th>風險等級</th>
-                        <th>分配比例</th>
-                        <th>分配金額</th>
-                        <th>單筆投資</th>
-                        <th>每月投資</th>
-                    </tr>
-                    <tr>
-                        <td>低風險</td>
-                        <td><span id="lowRiskRatioDisplay" class="result"></span></td>
-                        <td><span id="lowRiskAmount" class="result"></span></td>
-                        <td><span id="lowRiskLumpSum" class="result"></span></td>
-                        <td><span id="lowRiskMonthly" class="result"></span></td>
-                    </tr>
-                    <tr>
-                        <td>中風險</td>
-                        <td><span id="midRiskRatioDisplay" class="result"></span></td>
-                        <td><span id="midRiskAmount" class="result"></span></td>
-                        <td><span id="midRiskLumpSum" class="result"></span></td>
-                        <td><span id="midRiskMonthly" class="result"></span></td>
-                    </tr>
-                    <tr>
-                        <td>高風險</td>
-                        <td><span id="highRiskRatioDisplay" class="result"></span></td>
-                        <td><span id="highRiskAmount" class="result"></span></td>
-                        <td><span id="highRiskLumpSum" class="result"></span></td>
-                        <td><span id="highRiskMonthly" class="result"></span></td>
-                    </tr>
-                    <tr>
-                        <td><strong>總計</strong></td>
-                        <td><span id="totalRiskRatio" class="result"></span></td>
-                        <td><span id="totalRiskAmount" class="result"></span></td>
-                        <td>-</td>
-                        <td>-</td>
-                    </tr>
-                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>中風險</td>
+                            <td><div class="input-group"><input type="number" id="midRiskRatio" value="50" min="0" max="100" step="0.1" onchange="calculate()"></div></td>
+                            <td><div class="input-group"><input type="number" id="midRiskROI" value="5" min="0" step="0.1" onchange="calculate()"></div></td>
+                        </tr>
+                        <tr>
+                            <td>高風險</td>
+                            <td><div class="input-group"><input type="number" id="highRiskRatio" value="20" min="0" max="100" step="0.1" onchange="calculate()"></div></td>
+                            <td><div class="input-group"><input type="number" id="highRiskROI" value="8" min="0" step="0.1" onchange="calculate()"></div></td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="section">
+                    <h3>投資年數</h3>
+                    <table class="two-col-table">
+                        <tr><th>參數項目</th><th>數值</th></tr>
+                        <tr><td>單筆投資年數</td><td><input type="number" id="lumpSumYears" value="20" min="0" onchange="calculate()"></td></tr>
+                        <tr><td>定期定額投資年數</td><td><input type="number" id="monthlyYears" value="32" min="0" onchange="calculate()"></td></tr>
+                    </table>
+                </div>
+                
+                <div class="section">
+                    <h3>風險投資結果</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <tr><th>風險等級</th><th>分配比例</th><th>分配金額</th><th>單筆投資</th><th>每月投資</th></tr>
+                            <tr><td>低風險</td><td><span id="lowRiskRatioDisplay" class="result"></span></td><td><span id="lowRiskAmount" class="result"></span></td><td><span id="lowRiskLumpSum" class="result"></span></td><td><span id="lowRiskMonthly" class="result"></span></td></tr>
+                            <tr><td>中風險</td><td><span id="midRiskRatioDisplay" class="result"></span></td><td><span id="midRiskAmount" class="result"></span></td><td><span id="midRiskLumpSum" class="result"></span></td><td><span id="midRiskMonthly" class="result"></span></td></tr>
+                            <tr><td>高風險</td><td><span id="highRiskRatioDisplay" class="result"></span></td><td><span id="highRiskAmount" class="result"></span></td><td><span id="highRiskLumpSum" class="result"></span></td><td><span id="highRiskMonthly" class="result"></span></td></tr>
+                            <tr><td><strong>總計</strong></td><td><span id="totalRiskRatio" class="result"></span></td><td><span id="totalRiskAmount" class="result"></span></td><td>-</td><td>-</td></tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 顧問諮詢區塊開始 -->
+                <div class="section" style="background-color: #fffbeb; padding: 15px; border-radius: 8px; border: 1px solid #fde68a; margin-top: 20px;">
+                    <h3 style="color: #d97706; margin-top:0;">專人諮詢與解析</h3>
+                    <p style="font-size: 14px; color: #4b5563;">如果需要進一步的規劃，可以將上述結果傳送給顧問為您解析：</p>
+                    
+                    <label style="display: flex; align-items: flex-start; gap: 10px; font-size: 14px; cursor: pointer; margin-bottom: 15px; line-height: 1.4;">
+                        <input type="checkbox" id="consentCheckbox" style="width: 18px; height: 18px; margin-top: 2px;">
+                        <span>我同意將上述試算結果與聯絡資訊提供給專業顧問，以利後續提供專屬的退休規劃建議。</span>
+                    </label>
+                    
+                    <button id="submitToAgentBtn" class="main-btn" style="background-color: #d97706; margin: 0; width: 100%; max-width: none;" onclick="sendDataToGoogleSheet()">🚀 將試算結果傳送給顧問</button>
+                    <div id="submitStatus" style="text-align: center; margin-top: 10px; font-weight: bold; display: none;"></div>
+                </div>
+                <!-- 顧問諮詢區塊結束 -->
+
+                <button class="export-btn" onclick="exportToCSV()">📥 匯出這筆試算資料 (Excel/CSV)</button>
+
             </div>
         </div>
     </div>
 
-    <script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-            return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-                try {
-                    console.warn('XLSX 功能未啟用，請載入 XLSX 庫');
-                    return "";
-                } catch (e) {
-                    console.error('Excel 檔案處理錯誤:', e);
-                    return "";
-                }
+    <script>
+        let lowRiskSubItems = [ { name: '定存', ratio: 60, roi: 2 }, { name: '活期', ratio: 40, roi: 1 } ];
+
+        function showResultsAndCalculate() {
+            try {
+                calculate();
+                const btn = document.getElementById('startBtn');
+                btn.innerHTML = '✅ 計算完成！請往下看 👇';
+                btn.style.backgroundColor = '#10b981';
+                const resultsArea = document.getElementById('resultsArea');
+                resultsArea.style.display = 'block';
+                setTimeout(() => { resultsArea.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 150);
+            } catch (error) {
+                alert('糟糕！計算過程中發生了一點小錯誤，請重新整理網頁再試一次。');
+                console.error('按鈕執行錯誤細節:', error);
             }
-            return gk_fileData[filename] || "";
         }
 
-        let lowRiskSubItems = [
-            { name: '定存', ratio: 60, roi: 2 },
-            { name: '活期', ratio: 40, roi: 1 }
-        ];
-        let isSubItemsExpanded = false;
+        // ====== 自動寄送資料到 Google 試算表的功能 ======
+        function sendDataToGoogleSheet() {
+            const consent = document.getElementById('consentCheckbox').checked;
+            if (!consent) {
+                alert("請先勾選同意提供資料，才能將結果傳送給顧問喔！");
+                return;
+            }
+
+            const btn = document.getElementById('submitToAgentBtn');
+            const status = document.getElementById('submitStatus');
+            
+            btn.disabled = true;
+            btn.innerText = "資料傳送中，請稍候...";
+            status.style.display = "none";
+
+            const data = {
+                name: document.getElementById('clientName').value || '未填寫',
+                phone: document.getElementById('clientPhone').value || '未填寫',
+                totalNeeds: document.getElementById('totalRetirementNeeds').innerText,
+                prepared: document.getElementById('preparedFunds').innerText,
+                gap: document.getElementById('retirementGap').innerText
+            };
+
+            // 這是從你的截圖中擷取下來的網址（若測試失敗，請將這段引號內的網址換成你自己複製的版本）
+            const scriptURL = 'https://script.google.com/macros/s/AKfycbzTIVpLGZoi24ImpGs3uAp7oslAPs3cdOMyt4aE-sL-aV6c0jFh_TBCzP6NiOsBLPI/exec';
+
+            fetch(scriptURL, {
+                method: 'POST',
+                mode: 'no-cors', // 避免跨網域被瀏覽器阻擋
+                headers: {
+                    'Content-Type': 'text/plain;charset=utf-8',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(() => {
+                status.style.display = "block";
+                status.style.color = "green";
+                status.innerText = "✅ 傳送成功！顧問將會盡快與您聯繫。";
+                btn.innerText = "已成功傳送";
+            })
+            .catch(error => {
+                status.style.display = "block";
+                status.style.color = "red";
+                status.innerText = "❌ 傳送失敗，請檢查網路連線或稍後再試。";
+                btn.disabled = false;
+                btn.innerText = "🚀 重新傳送";
+            });
+        }
+        // ===========================================
+
+        // ====== 這邊是原本的 CSV 匯出功能 ======
+        function exportToCSV() {
+            const name = document.getElementById('clientName').value || '未填寫';
+            const dob = document.getElementById('clientDOB').value || '未填寫';
+            const phone = document.getElementById('clientPhone').value || '未填寫';
+            const job = document.getElementById('clientJob').value || '未填寫';
+            const gender = document.getElementById('clientGender').value || '未填寫';
+
+            const totalRetirementNeeds = document.getElementById('totalRetirementNeeds').innerText;
+            const preparedFunds = document.getElementById('preparedFunds').innerText;
+            const retirementGap = document.getElementById('retirementGap').innerText;
+
+            let csvContent = "大項,欄位名稱,內容\n";
+            csvContent += `基本資料,姓名,"${name}"\n`;
+            csvContent += `基本資料,出生年月日,"${dob}"\n`;
+            csvContent += `基本資料,電話號碼,"${phone}"\n`;
+            csvContent += `基本資料,職業,"${job}"\n`;
+            csvContent += `基本資料,性別,"${gender}"\n`;
+            csvContent += `試算結果,退休金總需求,"${totalRetirementNeeds}"\n`;
+            csvContent += `試算結果,已準備資金,"${preparedFunds}"\n`;
+            csvContent += `試算結果,退休金缺口,"${retirementGap}"\n`;
+
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            
+            const fileNameName = name === '未填寫' ? '客戶' : name;
+            link.setAttribute("href", url);
+            link.setAttribute("download", `${fileNameName}_退休金試算報告.csv`);
+            
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        // =========================================================
 
         function toggleLowRiskSubItems() {
-            isSubItemsExpanded = !isSubItemsExpanded;
-            const subItemsRow = document.getElementById('lowRiskSubItemsRow');
-            const subItemsContainer = subItemsRow?.querySelector('.sub-item-container');
-            const toggleButton = document.querySelector('.toggle-sub-items');
-            if (subItemsRow && subItemsContainer && toggleButton) {
-                if (isSubItemsExpanded) {
-                    subItemsRow.style.display = 'table-row';
-                    subItemsContainer.classList.add('expanded');
-                    toggleButton.classList.add('expanded');
-                    toggleButton.innerHTML = '▲';
-                } else {
-                    subItemsContainer.classList.remove('expanded');
-                    subItemsRow.style.display = 'none';
-                    toggleButton.classList.remove('expanded');
-                    toggleButton.innerHTML = '▼';
-                }
-            }
-            calculate();
+            const row = document.getElementById('lowRiskSubItemsRow');
+            const btn = document.querySelector('.toggle-sub-items');
+            if(row.style.display === 'none') { row.style.display = 'table-row'; btn.innerHTML = '▲'; } 
+            else { row.style.display = 'none'; btn.innerHTML = '▼'; }
         }
 
-        function addLowRiskSubItem() {
-            lowRiskSubItems.push({ name: '', ratio: 0, roi: 0 });
-            renderLowRiskSubItems();
-            calculate();
-        }
-
-        function removeLowRiskSubItem(index) {
-            if (index >= 0 && index < lowRiskSubItems.length) {
-                lowRiskSubItems.splice(index, 1);
-                renderLowRiskSubItems();
-                calculate();
-            }
-        }
-
+        function addLowRiskSubItem() { lowRiskSubItems.push({ name: '', ratio: 0, roi: 0 }); renderLowRiskSubItems(); calculate(); }
+        function removeLowRiskSubItem(index) { lowRiskSubItems.splice(index, 1); renderLowRiskSubItems(); calculate(); }
         function updateLowRiskSubItem(index, field, value) {
-            if (index >= 0 && index < lowRiskSubItems.length) {
-                if (field === 'name') {
-                    lowRiskSubItems[index].name = value;
-                } else if (field === 'ratio') {
-                    lowRiskSubItems[index].ratio = parseFloat(value) || 0;
-                } else if (field === 'roi') {
-                    lowRiskSubItems[index].roi = parseFloat(value) || 0;
-                }
-                renderLowRiskSubItems();
-                calculate();
-            }
+            if (field === 'name') { lowRiskSubItems[index].name = value; } else { lowRiskSubItems[index][field] = parseFloat(value) || 0; }
+            renderLowRiskSubItems(); calculate();
         }
 
         function calculateWeightedLowRiskROI() {
@@ -548,173 +404,85 @@
 
         function renderLowRiskSubItems() {
             const container = document.getElementById('lowRiskSubItems');
-            const resultsContainer = document.getElementById('lowRiskSubItemsResults');
-            if (!container || !resultsContainer) {
-                console.error('找不到 lowRiskSubItems 或 lowRiskSubItemsResults 元素');
-                return;
-            }
-
-            container.innerHTML = '';
-            lowRiskSubItems.forEach((item, index) => {
-                const div = document.createElement('div');
-                div.className = 'sub-item-row';
-                div.innerHTML = `
+            container.innerHTML = lowRiskSubItems.map((item, index) => `
+                <div class="sub-item-row">
                     <input type="text" value="${item.name}" placeholder="子項目名稱" onchange="updateLowRiskSubItem(${index}, 'name', this.value)">
                     <input type="number" value="${item.ratio}" min="0" step="0.1" placeholder="比例 (%)" onchange="updateLowRiskSubItem(${index}, 'ratio', this.value)">
                     <input type="number" value="${item.roi}" min="0" step="0.1" placeholder="報酬率 (%)" onchange="updateLowRiskSubItem(${index}, 'roi', this.value)">
                     <button onclick="removeLowRiskSubItem(${index})">刪除</button>
-                `;
-                container.appendChild(div);
-            });
-
-            resultsContainer.innerHTML = `
-                <tr>
-                    <th>子項目</th>
-                    <th>分配比例 (%)</th>
-                    <th>分配金額 (NT$)</th>
-                    <th>單筆投資 (NT$)</th>
-                    <th>每月投資 (NT$)</th>
-                </tr>
-            `;
-            lowRiskSubItems.forEach((_, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${lowRiskSubItems[index].name || '未命名'}</td>
-                    <td><span id="subItemRatio${index}" class="result">-</span></td>
-                    <td><span id="subItemAmount${index}" class="result">-</span></td>
-                    <td><span id="subItemLumpSum${index}" class="result">-</span></td>
-                    <td><span id="subItemMonthly${index}" class="result">-</span></td>
-                `;
-                resultsContainer.appendChild(row);
-            });
-
-            const subItemsRow = document.getElementById('lowRiskSubItemsRow');
-            const subItemsContainer = subItemsRow?.querySelector('.sub-item-container');
-            const toggleButton = document.querySelector('.toggle-sub-items');
-            if (subItemsRow && subItemsContainer && toggleButton) {
-                if (isSubItemsExpanded) {
-                    subItemsRow.style.display = 'table-row';
-                    subItemsContainer.classList.add('expanded');
-                    toggleButton.classList.add('expanded');
-                    toggleButton.innerHTML = '▲';
-                } else {
-                    subItemsContainer.classList.remove('expanded');
-                    subItemsRow.style.display = 'none';
-                    toggleButton.classList.remove('expanded');
-                    toggleButton.innerHTML = '▼';
-                }
-            }
+                </div>
+            `).join('');
         }
 
         function calculate() {
             try {
-                const inputs = {
-                    currentAge: document.getElementById('currentAge'),
-                    workStartAge: document.getElementById('workStartAge'),
-                    retirementAge: document.getElementById('retirementAge'),
-                    lifeExpectancy: document.getElementById('lifeExpectancy'),
-                    currentSalary: document.getElementById('currentSalary'),
-                    salaryIncreaseRate: document.getElementById('salaryIncreaseRate'),
-                    currentLivingStandard: document.getElementById('currentLivingStandard'),
-                    inflationRate: document.getElementById('inflationRate'),
-                    preRetirementROI: document.getElementById('preRetirementROI'),
-                    postRetirementROI: document.getElementById('postRetirementROI'),
-                    currentTravelCost: document.getElementById('currentTravelCost'),
-                    travelCostGrowthRate: document.getElementById('travelCostGrowthRate'),
-                    travelUntilAge: document.getElementById('travelUntilAge'),
-                    currentCareCost: document.getElementById('currentCareCost'),
-                    careCostGrowthRate: document.getElementById('careCostGrowthRate'),
-                    careStartAge: document.getElementById('careStartAge'),
-                    laborInsurance: document.getElementById('laborInsurance'),
-                    laborPension: document.getElementById('laborPension'),
-                    selfPrepared: document.getElementById('selfPrepared'),
-                    lumpSumYears: document.getElementById('lumpSumYears'),
-                    monthlyYears: document.getElementById('monthlyYears'),
-                    lowRiskRatio: document.getElementById('lowRiskRatio'),
-                    midRiskRatio: document.getElementById('midRiskRatio'),
-                    highRiskRatio: document.getElementById('highRiskRatio'),
-                    midRiskROI: document.getElementById('midRiskROI'),
-                    highRiskROI: document.getElementById('highRiskROI')
-                };
-
-                for (const [key, element] of Object.entries(inputs)) {
-                    if (!element) {
-                        console.error(`找不到輸入元素: ${key}`);
-                        return;
-                    }
-                }
-
-                const currentAge = Math.max(0, parseFloat(inputs.currentAge.value) || 0);
-                const workStartAge = Math.max(0, parseFloat(inputs.workStartAge.value) || 0);
-                const retirementAge = Math.max(0, parseFloat(inputs.retirementAge.value) || 0);
-                const lifeExpectancy = Math.max(0, parseFloat(inputs.lifeExpectancy.value) || 0);
-                const currentSalary = Math.max(0, parseFloat(inputs.currentSalary.value) || 0);
-                const salaryIncreaseRate = Math.max(0, parseFloat(inputs.salaryIncreaseRate.value) / 100 || 0);
-                const currentLivingStandard = Math.max(0, parseFloat(inputs.currentLivingStandard.value) || 0);
-                const inflationRate = Math.max(0, parseFloat(inputs.inflationRate.value) / 100 || 0);
-                const preRetirementROI = Math.max(0, parseFloat(inputs.preRetirementROI.value) / 100 || 0);
-                const postRetirementROI = Math.max(0, parseFloat(inputs.postRetirementROI.value) / 100 || 0);
-                const currentTravelCost = Math.max(0, parseFloat(inputs.currentTravelCost.value) || 0);
-                const travelCostGrowthRate = Math.max(0, parseFloat(inputs.travelCostGrowthRate.value) / 100 || 0);
-                const travelUntilAge = Math.max(0, parseFloat(inputs.travelUntilAge.value) || 0);
-                const currentCareCost = Math.max(0, parseFloat(inputs.currentCareCost.value) || 0);
-                const careCostGrowthRate = Math.max(0, parseFloat(inputs.careCostGrowthRate.value) / 100 || 0);
-                const careStartAge = Math.max(0, parseFloat(inputs.careStartAge.value) || 0);
-                const laborInsurance = Math.max(0, parseFloat(inputs.laborInsurance.value) || 0);
-                const laborPension = Math.max(0, parseFloat(inputs.laborPension.value) || 0);
-                const selfPrepared = Math.max(0, parseFloat(inputs.selfPrepared.value) || 0);
-                const lumpSumYears = Math.max(0, parseFloat(inputs.lumpSumYears.value) || 0);
-                const monthlyYears = Math.max(0, parseFloat(inputs.monthlyYears.value) || 0);
-                const lowRiskRatio = Math.max(0, parseFloat(inputs.lowRiskRatio.value) / 100 || 0);
-                const midRiskRatio = Math.max(0, parseFloat(inputs.midRiskRatio.value) / 100 || 0);
-                const highRiskRatio = Math.max(0, parseFloat(inputs.highRiskRatio.value) / 100 || 0);
-                const midRiskROI = Math.max(0, parseFloat(inputs.midRiskROI.value) / 100 || 0);
-                const highRiskROI = Math.max(0, parseFloat(inputs.highRiskROI.value) / 100 || 0);
+                const currentAge = Math.max(0, parseFloat(document.getElementById('currentAge').value) || 0);
+                const workStartAge = Math.max(0, parseFloat(document.getElementById('workStartAge').value) || 0);
+                const retirementAge = Math.max(0, parseFloat(document.getElementById('retirementAge').value) || 0);
+                const lifeExpectancy = Math.max(0, parseFloat(document.getElementById('lifeExpectancy').value) || 0);
+                
+                const currentSalary = Math.max(0, parseFloat(document.getElementById('currentSalary').value) || 0);
+                const salaryIncreaseRate = Math.max(0, parseFloat(document.getElementById('salaryIncreaseRate').value) / 100 || 0);
+                
+                const currentLivingStandard = Math.max(0, parseFloat(document.getElementById('currentLivingStandard').value) || 0);
+                const inflationRate = Math.max(0, parseFloat(document.getElementById('inflationRate').value) / 100 || 0);
+                const preRetirementROI = Math.max(0, parseFloat(document.getElementById('preRetirementROI').value) / 100 || 0);
+                const postRetirementROI = Math.max(0, parseFloat(document.getElementById('postRetirementROI').value) / 100 || 0);
+                
+                const currentTravelCost = Math.max(0, parseFloat(document.getElementById('currentTravelCost').value) || 0);
+                const travelCostGrowthRate = Math.max(0, parseFloat(document.getElementById('travelCostGrowthRate').value) / 100 || 0);
+                const travelUntilAge = Math.max(0, parseFloat(document.getElementById('travelUntilAge').value) || 0);
+                
+                const currentCareCost = Math.max(0, parseFloat(document.getElementById('currentCareCost').value) || 0);
+                const careCostGrowthRate = Math.max(0, parseFloat(document.getElementById('careCostGrowthRate').value) / 100 || 0);
+                const careStartAge = Math.max(0, parseFloat(document.getElementById('careStartAge').value) || 0);
+                
+                const laborInsurance = Math.max(0, parseFloat(document.getElementById('laborInsurance').value) || 0);
+                const laborPension = Math.max(0, parseFloat(document.getElementById('laborPension').value) || 0);
+                const selfPrepared = Math.max(0, parseFloat(document.getElementById('selfPrepared').value) || 0);
+                
+                const lumpSumYears = Math.max(0, parseFloat(document.getElementById('lumpSumYears').value) || 0);
+                const monthlyYears = Math.max(0, parseFloat(document.getElementById('monthlyYears').value) || 0);
+                
+                const lowRiskRatio = Math.max(0, parseFloat(document.getElementById('lowRiskRatio').value) / 100 || 0);
+                const midRiskRatio = Math.max(0, parseFloat(document.getElementById('midRiskRatio').value) / 100 || 0);
+                const highRiskRatio = Math.max(0, parseFloat(document.getElementById('highRiskRatio').value) / 100 || 0);
+                const midRiskROI = Math.max(0, parseFloat(document.getElementById('midRiskROI').value) / 100 || 0);
+                const highRiskROI = Math.max(0, parseFloat(document.getElementById('highRiskROI').value) / 100 || 0);
 
                 const carePeriod = Math.max(0, lifeExpectancy - careStartAge);
                 const travelPeriod = Math.max(0, travelUntilAge - retirementAge);
 
                 const totalRiskRatio = lowRiskRatio + midRiskRatio + highRiskRatio;
-                const riskAllocationError = document.getElementById('riskAllocationError');
-                if (riskAllocationError) {
-                    if (Math.abs(totalRiskRatio - 1) > 0.001) {
-                        riskAllocationError.style.display = 'block';
-                        return;
-                    } else {
-                        riskAllocationError.style.display = 'none';
-                    }
-                }
+                const riskError = document.getElementById('riskAllocationError');
+                if (Math.abs(totalRiskRatio - 1) > 0.001) { riskError.style.display = 'block'; return; } else { riskError.style.display = 'none'; }
 
                 const totalSubItemRatio = lowRiskSubItems.reduce((sum, item) => sum + (item.ratio || 0), 0);
-                const lowRiskSubItemsError = document.getElementById('lowRiskSubItemsError');
-                if (lowRiskSubItemsError) {
-                    if (Math.abs(totalSubItemRatio - 100) > 0.001) {
-                        lowRiskSubItemsError.style.display = 'block';
-                    } else {
-                        lowRiskSubItemsError.style.display = 'none';
-                    }
-                }
+                const subError = document.getElementById('lowRiskSubItemsError');
+                if (Math.abs(totalSubItemRatio - 100) > 0.001) { subError.style.display = 'block'; } else { subError.style.display = 'none'; }
 
                 const lowRiskROI = calculateWeightedLowRiskROI() / 100;
-                const lowRiskROIElement = document.getElementById('lowRiskROI');
-                const lowRiskWeightedROIElement = document.getElementById('lowRiskWeightedROI');
-                if (lowRiskROIElement) lowRiskROIElement.textContent = `${(lowRiskROI * 100).toFixed(1)}%`;
-                if (lowRiskWeightedROIElement) lowRiskWeightedROIElement.textContent = `${(lowRiskROI * 100).toFixed(1)}%`;
+                document.getElementById('lowRiskROI').textContent = (lowRiskROI * 100).toFixed(1);
+                document.getElementById('lowRiskWeightedROI').textContent = (lowRiskROI * 100).toFixed(1) + '%';
 
                 const retirementSalary = Math.abs(Math.round(currentSalary * Math.pow(1 + salaryIncreaseRate, retirementAge - currentAge)));
                 const postRetirementExpense = Math.abs(Math.round(currentLivingStandard * Math.pow(1 + inflationRate, retirementAge - currentAge)));
+                
                 const realRateLiving = (postRetirementROI - inflationRate) / 12;
                 const monthsLiving = (lifeExpectancy - retirementAge) * 12;
                 const totalLivingNeeds = Math.abs(Math.round(realRateLiving !== 0 ? -postRetirementExpense * ((1 - Math.pow(1 + realRateLiving, -monthsLiving)) / realRateLiving) * (1 + realRateLiving) : -postRetirementExpense * monthsLiving));
+                
                 const futureTravelCost = Math.abs(Math.round(currentTravelCost * Math.pow(1 + travelCostGrowthRate, retirementAge - currentAge)));
                 const realRateTravel = postRetirementROI - travelCostGrowthRate;
                 const yearsTravel = travelPeriod;
                 const totalTravelNeeds = Math.abs(Math.round(realRateTravel !== 0 && yearsTravel > 0 ? -futureTravelCost * ((1 - Math.pow(1 + realRateTravel, -yearsTravel)) / realRateTravel) * (1 + realRateTravel) : 0));
+                
                 const futureCareCost = Math.abs(Math.round(currentCareCost * Math.pow(1 + careCostGrowthRate, careStartAge - currentAge)));
                 const realRateCare = (postRetirementROI - careCostGrowthRate) / 12;
                 const monthsCare = carePeriod * 12;
                 const totalCareNeeds = Math.abs(Math.round(realRateCare !== 0 ? -futureCareCost * ((1 - Math.pow(1 + realRateCare, -monthsCare)) / realRateCare) * (1 + realRateLiving) : -futureCareCost * monthsCare));
                 const retirementCareCost = Math.abs(Math.round(postRetirementROI !== 0 ? -totalCareNeeds / Math.pow(1 + postRetirementROI, careStartAge - retirementAge) : -totalCareNeeds));
+                
                 const totalRetirementNeeds = Math.abs(Math.round(totalLivingNeeds + retirementCareCost + totalTravelNeeds));
 
                 let laborInsuranceAmount = "未滿60歲無法領年金";
@@ -726,133 +494,93 @@
                     laborInsuranceValue = Math.abs(Math.round(realRateLiving !== 0 ? -monthlyPension * ((1 - Math.pow(1 + realRateLiving, -monthsLiving)) / realRateLiving) * (1 + realRateLiving) : -monthlyPension * monthsLiving));
                     laborInsuranceAmount = laborInsuranceValue;
                 }
+                
                 const laborPensionAmount = Math.abs(Math.round(laborPension));
                 const selfPreparedAmount = Math.abs(Math.round(selfPrepared));
                 const preparedFunds = Math.abs(Math.round(laborInsuranceValue + laborPensionAmount + selfPreparedAmount));
                 const retirementGap = Math.round(totalRetirementNeeds - preparedFunds);
 
+                document.getElementById('retirementSalary').textContent = `NT$${retirementSalary.toLocaleString()}`;
+                document.getElementById('postRetirementExpense').textContent = `NT$${postRetirementExpense.toLocaleString()}`;
+                document.getElementById('totalLivingNeeds').textContent = `NT$${totalLivingNeeds.toLocaleString()}`;
+                document.getElementById('futureTravelCost').textContent = `NT$${futureTravelCost.toLocaleString()}`;
+                document.getElementById('totalTravelNeeds').textContent = `NT$${totalTravelNeeds.toLocaleString()}`;
+                document.getElementById('futureCareCost').textContent = `NT$${futureCareCost.toLocaleString()}`;
+                document.getElementById('totalCareNeeds').textContent = `NT$${totalCareNeeds.toLocaleString()}`;
+                document.getElementById('retirementCareCost').textContent = `NT$${retirementCareCost.toLocaleString()}`;
+                document.getElementById('totalRetirementNeeds').textContent = `NT$${totalRetirementNeeds.toLocaleString()}`;
+                document.getElementById('laborInsuranceAmount').textContent = typeof laborInsuranceAmount === 'number' ? `NT$${laborInsuranceAmount.toLocaleString()}` : laborInsuranceAmount;
+                document.getElementById('laborPensionAmount').textContent = `NT$${laborPensionAmount.toLocaleString()}`;
+                document.getElementById('selfPreparedAmount').textContent = `NT$${selfPreparedAmount.toLocaleString()}`;
+                document.getElementById('preparedFunds').textContent = `NT$${preparedFunds.toLocaleString()}`;
+                
+                const gapText = retirementGap > 0 ? `NT$${retirementGap.toLocaleString()}` : `資金充足 (盈餘: NT$${Math.abs(retirementGap).toLocaleString()})`;
+                document.getElementById('retirementGap').textContent = gapText;
+                document.getElementById('retirementGapInvestment').textContent = gapText;
+
                 let lowRiskAmount = 0, midRiskAmount = 0, highRiskAmount = 0;
                 let lowRiskLumpSum = 0, midRiskLumpSum = 0, highRiskLumpSum = 0;
                 let lowRiskMonthly = 0, midRiskMonthly = 0, highRiskMonthly = 0;
+
                 if (retirementGap > 0) {
                     lowRiskAmount = Math.round(retirementGap * lowRiskRatio);
                     midRiskAmount = Math.round(retirementGap * midRiskRatio);
                     highRiskAmount = Math.round(retirementGap * highRiskRatio);
                     highRiskAmount += retirementGap - (lowRiskAmount + midRiskAmount + highRiskAmount);
+
                     lowRiskLumpSum = Math.abs(Math.round(lowRiskROI !== 0 ? lowRiskAmount / Math.pow(1 + lowRiskROI, lumpSumYears) : lowRiskAmount));
                     midRiskLumpSum = Math.abs(Math.round(midRiskROI !== 0 ? midRiskAmount / Math.pow(1 + midRiskROI, lumpSumYears) : midRiskAmount));
                     highRiskLumpSum = Math.abs(Math.round(highRiskROI !== 0 ? highRiskAmount / Math.pow(1 + highRiskROI, lumpSumYears) : highRiskAmount));
+                    
                     const lowRiskMonthlyRate = lowRiskROI / 12;
                     const midRiskMonthlyRate = midRiskROI / 12;
                     const highRiskMonthlyRate = highRiskROI / 12;
                     const monthsInvestment = monthlyYears * 12;
+                    
                     lowRiskMonthly = Math.abs(Math.round(lowRiskMonthlyRate !== 0 ? lowRiskAmount * lowRiskMonthlyRate / (Math.pow(1 + lowRiskMonthlyRate, monthsInvestment) - 1) * (1 + lowRiskMonthlyRate) : lowRiskAmount / monthsInvestment));
                     midRiskMonthly = Math.abs(Math.round(midRiskMonthlyRate !== 0 ? midRiskAmount * midRiskMonthlyRate / (Math.pow(1 + midRiskMonthlyRate, monthsInvestment) - 1) * (1 + midRiskMonthlyRate) : midRiskAmount / monthsInvestment));
                     highRiskMonthly = Math.abs(Math.round(highRiskMonthlyRate !== 0 ? highRiskAmount * highRiskMonthlyRate / (Math.pow(1 + highRiskMonthlyRate, monthsInvestment) - 1) * (1 + highRiskMonthlyRate) : highRiskAmount / monthsInvestment));
 
-                    lowRiskSubItems.forEach((item, index) => {
-                        const subItemRatio = totalSubItemRatio > 0 ? (item.ratio || 0) / totalSubItemRatio : 0;
-                        const subItemAmount = Math.round(lowRiskAmount * subItemRatio);
-                        const subItemROI = (item.roi || 0) / 100;
-                        const subItemMonthlyRate = subItemROI / 12;
-                        const subItemLumpSum = Math.abs(Math.round(subItemROI !== 0 ? subItemAmount / Math.pow(1 + subItemROI, lumpSumYears) : subItemAmount));
-                        const subItemMonthly = Math.abs(Math.round(subItemMonthlyRate !== 0 ? subItemAmount * subItemMonthlyRate / (Math.pow(1 + subItemMonthlyRate, monthsInvestment) - 1) * (1 + subItemMonthlyRate) : subItemAmount / monthsInvestment));
-
-                        const fields = {
-                            [`subItemRatio${index}`]: retirementGap > 0 ? `${(subItemRatio * 100).toFixed(1)}%` : '-',
-                            [`subItemAmount${index}`]: retirementGap > 0 ? `NT$${subItemAmount.toLocaleString()}` : '-',
-                            [`subItemLumpSum${index}`]: retirementGap > 0 ? `NT$${subItemLumpSum.toLocaleString()}` : '無需額外投資',
-                            [`subItemMonthly${index}`]: retirementGap > 0 ? `NT$${subItemMonthly.toLocaleString()}` : '無需額外投資'
-                        };
-                        Object.entries(fields).forEach(([id, value]) => {
-                            const element = document.getElementById(id);
-                            if (element) element.textContent = value;
-                        });
-                    });
+                    const resultBody = document.getElementById('subItemResultBody');
+                    resultBody.innerHTML = lowRiskSubItems.map((item, index) => {
+                        const subRatio = totalSubItemRatio > 0 ? (item.ratio || 0) / totalSubItemRatio : 0;
+                        const subAmount = Math.round(lowRiskAmount * subRatio);
+                        const subROI = (item.roi || 0) / 100;
+                        const subMthRate = subROI / 12;
+                        const subLump = Math.abs(Math.round(subROI !== 0 ? subAmount / Math.pow(1 + subROI, lumpSumYears) : subAmount));
+                        const subMth = Math.abs(Math.round(subMthRate !== 0 ? subAmount * subMthRate / (Math.pow(1 + subMthRate, monthsInvestment) - 1) * (1 + subMthRate) : subAmount / monthsInvestment));
+                        
+                        return `<tr><td>${item.name || '未命名'}</td><td>${(subRatio * 100).toFixed(1)}%</td><td>NT$${subAmount.toLocaleString()}</td><td>NT$${subLump.toLocaleString()}</td><td>NT$${subMth.toLocaleString()}</td></tr>`;
+                    }).join('');
                 }
 
-                const fields = {
-                    retirementSalary: `NT$${retirementSalary.toLocaleString()}`,
-                    postRetirementExpense: `NT$${postRetirementExpense.toLocaleString()}`,
-                    totalLivingNeeds: `NT$${totalLivingNeeds.toLocaleString()}`,
-                    futureTravelCost: `NT$${futureTravelCost.toLocaleString()}`,
-                    totalTravelNeeds: `NT$${totalTravelNeeds.toLocaleString()}`,
-                    futureCareCost: `NT$${futureCareCost.toLocaleString()}`,
-                    totalCareNeeds: `NT$${totalCareNeeds.toLocaleString()}`,
-                    retirementCareCost: `NT$${retirementCareCost.toLocaleString()}`,
-                    totalRetirementNeeds: `NT$${totalRetirementNeeds.toLocaleString()}`,
-                    laborInsuranceAmount: typeof laborInsuranceAmount === 'number' ? `NT$${laborInsuranceAmount.toLocaleString()}` : laborInsuranceAmount,
-                    laborPensionAmount: `NT$${laborPensionAmount.toLocaleString()}`,
-                    selfPreparedAmount: `NT$${selfPreparedAmount.toLocaleString()}`,
-                    preparedFunds: `NT$${preparedFunds.toLocaleString()}`,
-                    retirementGap: retirementGap > 0 ? `NT$${retirementGap.toLocaleString()}` : `資金充足 (盈餘: NT$${Math.abs(retirementGap).toLocaleString()})`,
-                    retirementGapInvestment: retirementGap > 0 ? `NT$${retirementGap.toLocaleString()}` : `資金充足 (盈餘: NT$${Math.abs(retirementGap).toLocaleString()})`,
-                    lowRiskRatioDisplay: retirementGap > 0 ? `${(lowRiskRatio * 100).toFixed(1)}%` : '-',
-                    midRiskRatioDisplay: retirementGap > 0 ? `${(midRiskRatio * 100).toFixed(1)}%` : '-',
-                    highRiskRatioDisplay: retirementGap > 0 ? `${(highRiskRatio * 100).toFixed(1)}%` : '-',
-                    lowRiskAmount: retirementGap > 0 ? `NT$${lowRiskAmount.toLocaleString()}` : '-',
-                    midRiskAmount: retirementGap > 0 ? `NT$${midRiskAmount.toLocaleString()}` : '-',
-                    highRiskAmount: retirementGap > 0 ? `NT$${highRiskAmount.toLocaleString()}` : '-',
-                    lowRiskLumpSum: retirementGap > 0 ? `NT$${lowRiskLumpSum.toLocaleString()}` : '無需額外投資',
-                    midRiskLumpSum: retirementGap > 0 ? `NT$${midRiskLumpSum.toLocaleString()}` : '無需額外投資',
-                    highRiskLumpSum: retirementGap > 0 ? `NT$${highRiskLumpSum.toLocaleString()}` : '無需額外投資',
-                    lowRiskMonthly: retirementGap > 0 ? `NT$${lowRiskMonthly.toLocaleString()}` : '無需額外投資',
-                    midRiskMonthly: retirementGap > 0 ? `NT$${midRiskMonthly.toLocaleString()}` : '無需額外投資',
-                    highRiskMonthly: retirementGap > 0 ? `NT$${highRiskMonthly.toLocaleString()}` : '無需額外投資',
-                    totalRiskRatio: retirementGap > 0 ? '100%' : '-',
-                    totalRiskAmount: retirementGap > 0 ? `NT$${retirementGap.toLocaleString()}` : '-'
-                };
+                document.getElementById('lowRiskRatioDisplay').textContent = retirementGap > 0 ? `${(lowRiskRatio * 100).toFixed(1)}%` : '-';
+                document.getElementById('midRiskRatioDisplay').textContent = retirementGap > 0 ? `${(midRiskRatio * 100).toFixed(1)}%` : '-';
+                document.getElementById('highRiskRatioDisplay').textContent = retirementGap > 0 ? `${(highRiskRatio * 100).toFixed(1)}%` : '-';
+                
+                document.getElementById('lowRiskAmount').textContent = retirementGap > 0 ? `NT$${lowRiskAmount.toLocaleString()}` : '-';
+                document.getElementById('midRiskAmount').textContent = retirementGap > 0 ? `NT$${midRiskAmount.toLocaleString()}` : '-';
+                document.getElementById('highRiskAmount').textContent = retirementGap > 0 ? `NT$${highRiskAmount.toLocaleString()}` : '-';
+                
+                document.getElementById('lowRiskLumpSum').textContent = retirementGap > 0 ? `NT$${lowRiskLumpSum.toLocaleString()}` : '無需投資';
+                document.getElementById('midRiskLumpSum').textContent = retirementGap > 0 ? `NT$${midRiskLumpSum.toLocaleString()}` : '無需投資';
+                document.getElementById('highRiskLumpSum').textContent = retirementGap > 0 ? `NT$${highRiskLumpSum.toLocaleString()}` : '無需投資';
+                
+                document.getElementById('lowRiskMonthly').textContent = retirementGap > 0 ? `NT$${lowRiskMonthly.toLocaleString()}` : '無需投資';
+                document.getElementById('midRiskMonthly').textContent = retirementGap > 0 ? `NT$${midRiskMonthly.toLocaleString()}` : '無需投資';
+                document.getElementById('highRiskMonthly').textContent = retirementGap > 0 ? `NT$${highRiskMonthly.toLocaleString()}` : '無需投資';
+                
+                document.getElementById('totalRiskRatio').textContent = retirementGap > 0 ? '100%' : '-';
+                document.getElementById('totalRiskAmount').textContent = retirementGap > 0 ? `NT$${retirementGap.toLocaleString()}` : '-';
 
-                Object.entries(fields).forEach(([id, value]) => {
-                    const element = document.getElementById(id);
-                    if (element) element.textContent = value;
-                });
             } catch (error) {
-                console.error('計算錯誤:', error.message, error.stack);
-                const fields = [
-                    'retirementSalary', 'postRetirementExpense', 'totalLivingNeeds',
-                    'futureTravelCost', 'totalTravelNeeds', 'futureCareCost',
-                    'totalCareNeeds', 'retirementCareCost', 'totalRetirementNeeds',
-                    'laborInsuranceAmount', 'laborPensionAmount', 'selfPreparedAmount',
-                    'preparedFunds', 'retirementGap', 'retirementGapInvestment',
-                    'lowRiskRatioDisplay', 'midRiskRatioDisplay', 'highRiskRatioDisplay',
-                    'lowRiskAmount', 'midRiskAmount', 'highRiskAmount',
-                    'lowRiskLumpSum', 'midRiskLumpSum', 'highRiskLumpSum',
-                    'lowRiskMonthly', 'midRiskMonthly', 'highRiskMonthly',
-                    'totalRiskRatio', 'totalRiskAmount'
-                ];
-                fields.forEach(field => {
-                    const element = document.getElementById(field);
-                    if (element) {
-                        element.textContent = field === 'laborInsuranceAmount' ? '計算錯誤' : 'NT$0';
-                    }
-                });
-                lowRiskSubItems.forEach((_, index) => {
-                    const fields = {
-                        [`subItemRatio${index}`]: '-',
-                        [`subItemAmount${index}`]: 'NT$0',
-                        [`subItemLumpSum${index}`]: 'NT$0',
-                        [`subItemMonthly${index}`]: 'NT$0'
-                    };
-                    Object.entries(fields).forEach(([id, value]) => {
-                        const element = document.getElementById(id);
-                        if (element) element.textContent = value;
-                    });
-                });
-                const riskAllocationError = document.getElementById('riskAllocationError');
-                const lowRiskSubItemsError = document.getElementById('lowRiskSubItemsError');
-                if (riskAllocationError) riskAllocationError.style.display = 'none';
-                if (lowRiskSubItemsError) lowRiskSubItemsError.style.display = 'none';
+                console.error('計算錯誤:', error);
+                throw error; 
             }
         }
 
         window.onload = function() {
-            try {
-                renderLowRiskSubItems();
-                calculate();
-            } catch (error) {
-                console.error('初始計算錯誤:', error.message, error.stack);
-            }
+            renderLowRiskSubItems();
         };
     </script>
 </body>
